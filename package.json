@@ -399,6 +399,11 @@
     },
     "commands": [
       {
+        "command": "java.completion.fullListForNext",
+        "title": "Get Full Completion List for Next Trigger",
+        "category": "Java"
+      },
+      {
         "command": "java.projectConfiguration.update",
         "title": "Update project configuration",
         "category": "Java"

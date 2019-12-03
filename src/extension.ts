@@ -295,7 +295,10 @@ export function activate(context: ExtensionContext): Promise<ExtensionAPI> {
 				languageClient.onRequest(SendNotificationRequest.type, (params) => {
 					return commands.executeCommand(params.command, ...params.arguments);
 				});
-
+				context.subscriptions.push(commands.registerCommand("java.completion.fullListForNext", async () => {
+					await <any>commands.executeCommand(Commands.EXECUTE_WORKSPACE_COMMAND, "java.completion.fullListForNext");
+					commands.executeCommand("editor.action.triggerSuggest");
+				}));
 				context.subscriptions.push(commands.registerCommand(Commands.SHOW_JAVA_REFERENCES, (uri: string, position: LSPosition, locations: LSLocation[]) => {
 					commands.executeCommand(Commands.SHOW_REFERENCES, Uri.parse(uri), languageClient.protocol2CodeConverter.asPosition(position), locations.map(languageClient.protocol2CodeConverter.asLocation));
 				}));
