@@ -460,6 +460,11 @@ export function activate(context: ExtensionContext): Promise<ExtensionAPI> {
 			context.subscriptions.push(commands.registerCommand(Commands.SHOW_SERVER_TASK_STATUS, () => serverTaskPresenter.presentServerTaskView()));
 
 			context.subscriptions.push(onConfigurationChange(languageClient, context));
+
+			context.subscriptions.push(commands.registerCommand("java.completion.allScopeForNext", async () => {
+				await commands.executeCommand(Commands.EXECUTE_WORKSPACE_COMMAND, "java.completion.allScopeForNext");
+				commands.executeCommand("editor.action.triggerSuggest");
+			}));
 		});
 	});
 }

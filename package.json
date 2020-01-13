@@ -5,7 +5,7 @@
   "author": "Red Hat",
   "icon": "icons/icon128.png",
   "license": "EPL-2.0",
-  "version": "0.56.0",
+  "version": "2.56.0-limit-scope",
   "publisher": "redhat",
   "bugs": "https://github.com/redhat-developer/vscode-java/issues",
   "preview": true,
@@ -279,6 +279,12 @@
           "description": "Maximum number of completion results (not including snippets).\nSetting 0 will disable the limit and return all results. Be aware the performance will be very negatively impacted.",
           "scope": "window"
         },
+        "java.completion.scopeMask": {
+          "type": "integer",
+          "default": 13,
+          "description": "Mask of searching scope. Bits: 1=source, 2=application libraries, 4=system libraries, 8=referenced projects.",
+          "scope": "window"
+        },
         "java.completion.enabled": {
           "type": "boolean",
           "default": true,
@@ -449,6 +455,11 @@
     },
     "commands": [
       {
+        "command": "java.completion.allScopeForNext",
+        "title": "Search All Scopes for Next Completion",
+        "category": "Java"
+      },
+      {
         "command": "java.projectConfiguration.update",
         "title": "Update project configuration",
         "category": "Java"
@@ -510,6 +521,11 @@
       }
     ],
     "keybindings": [
+      {
+        "command": "java.completion.allScopeForNext",
+        "key": "ctrl+shift+alt+a",
+        "when": "editorFocus"
+      },
       {
         "command": "java.projectConfiguration.update",
         "key": "shift+alt+u",
