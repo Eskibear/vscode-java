@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
 import { workspace, extensions, ExtensionContext, window, StatusBarAlignment, commands, ViewColumn, Uri, CancellationToken, TextDocumentContentProvider, languages, IndentAction, ProgressLocation, InputBoxOptions, Selection, Position, EventEmitter, OutputChannel, TextDocument, RelativePattern } from 'vscode';
-import { ExecuteCommandParams, ExecuteCommandRequest, LanguageClient, LanguageClientOptions, RevealOutputChannelOn, Position as LSPosition, Location as LSLocation, StreamInfo, ErrorHandler, Message, ErrorAction, CloseAction, DidChangeConfigurationNotification, Emitter } from 'vscode-languageclient';
+import { ExecuteCommandParams, ExecuteCommandRequest, LanguageClient, LanguageClientOptions, RevealOutputChannelOn, Position as LSPosition, Location as LSLocation, StreamInfo, ErrorHandler, Message, ErrorAction, CloseAction, DidChangeConfigurationNotification, Emitter, Disposable } from 'vscode-languageclient';
 import { onExtensionChange, collectJavaExtensions } from './plugin';
 import { prepareExecutable, awaitServerConnection } from './javaServerStarter';
 import { getDocumentSymbolsCommand, getDocumentSymbolsProvider } from './documentSymbols';
@@ -32,7 +32,7 @@ import { serverStatus, ServerStatusKind } from './serverStatus';
 import { SyntaxLanguageClient } from './syntaxLanguageClient';
 import { registerClientProviders, ClientHoverProvider } from './providerDispatcher';
 import * as fileEventHandler from './fileEventHandler';
-import { semanticTokensProvider, getSemanticTokensLegend } from './semanticTokenProvider';
+import { registerSemanticTokensProvider } from './semanticTokenProvider';
 
 let languageClient: LanguageClient;
 const syntaxClient: SyntaxLanguageClient = new SyntaxLanguageClient();
@@ -947,26 +947,4 @@ function isPrefix(parentPath: string, childPath: string): boolean {
 	}
 	const relative = path.relative(parentPath, childPath);
 	return !!relative && !relative.startsWith('..') && !path.isAbsolute(relative);
-}
-
-function isSemanticHTokensEnabled(): boolean {
-	const config = getJavaConfiguration();
-	const section = 'semanticTokens.enabled';
-	return config.get(section);
-}
-
-function registerSemanticTokensProvider(context: ExtensionContext) {
-	if (isSemanticHTokensEnabled()) {
-		getSemanticTokensLegend().then(legend => {
-			const semanticTokensProviderDisposable = languages.registerDocumentSemanticTokensProvider({ scheme: 'file', language: 'java' }, semanticTokensProvider, legend);
-			context.subscriptions.push(semanticTokensProviderDisposable);
-			const configChangeListener = workspace.onDidChangeConfiguration(e => {
-				if (e.affectsConfiguration('java.semanticTokens.enabled')) {
-					semanticTokensProviderDisposable.dispose();
-					configChangeListener.dispose();
-					registerSemanticTokensProvider(context);
-				}
-			});
-		});
-	}
 }
