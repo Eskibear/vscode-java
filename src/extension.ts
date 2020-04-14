@@ -519,9 +519,8 @@ export function activate(context: ExtensionContext): Promise<ExtensionAPI> {
 
 			context.subscriptions.push(onConfigurationChange(languageClient, context));
 
-			getSemanticTokensLegend().then(legend => {
-				context.subscriptions.push(languages.registerDocumentSemanticTokensProvider({ scheme: 'file', language: 'java' }, semanticTokensProvider, legend));
-			});
+			// temporary implementation Semantic Highlighting before it is part of LSP
+			registerSemanticTokensProvider(context);
 		});
 	});
 }
@@ -948,4 +947,26 @@ function isPrefix(parentPath: string, childPath: string): boolean {
 	}
 	const relative = path.relative(parentPath, childPath);
 	return !!relative && !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+
+function isSemanticHTokensEnabled(): boolean {
+	const config = getJavaConfiguration();
+	const section = 'semanticTokens.enabled';
+	return config.get(section);
+}
+
+function registerSemanticTokensProvider(context: ExtensionContext) {
+	if (isSemanticHTokensEnabled()) {
+		getSemanticTokensLegend().then(legend => {
+			const semanticTokensProviderDisposable = languages.registerDocumentSemanticTokensProvider({ scheme: 'file', language: 'java' }, semanticTokensProvider, legend);
+			context.subscriptions.push(semanticTokensProviderDisposable);
+			const configChangeListener = workspace.onDidChangeConfiguration(e => {
+				if (e.affectsConfiguration('java.semanticTokens.enabled')) {
+					semanticTokensProviderDisposable.dispose();
+					configChangeListener.dispose();
+					registerSemanticTokensProvider(context);
+				}
+			});
+		});
+	}
 }
