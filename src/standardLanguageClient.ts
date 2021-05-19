@@ -7,7 +7,7 @@ import { prepareExecutable, awaitServerConnection } from "./javaServerStarter";
 import { getJavaConfig, applyWorkspaceEdit } from "./extension";
 import { LanguageClientOptions, Position as LSPosition, Location as LSLocation, MessageType, TextDocumentPositionParams, ConfigurationRequest, ConfigurationParams } from "vscode-languageclient";
 import { LanguageClient, StreamInfo } from "vscode-languageclient/node";
-import { CompileWorkspaceRequest, CompileWorkspaceStatus, SourceAttachmentRequest, SourceAttachmentResult, SourceAttachmentAttribute, ProjectConfigurationUpdateRequest, FeatureStatus, StatusNotification, ProgressReportNotification, ActionableNotification, ExecuteClientCommandRequest, ServerNotification, EventNotification, EventType, LinkLocation, FindLinks } from "./protocol";
+import { CompileWorkspaceRequest, CompileWorkspaceStatus, SourceAttachmentRequest, SourceAttachmentResult, SourceAttachmentAttribute, ProjectConfigurationUpdateRequest, FeatureStatus, StatusNotification, ProgressReportNotification, ActionableNotification, ExecuteClientCommandRequest, ServerNotification, EventNotification, EventType, LinkLocation, FindLinks, PrepareTypeHierarchy, TypeHierarchyPrepareParams } from "./protocol";
 import { setGradleWrapperChecksum, excludeProjectSettingsFiles, ServerMode } from "./settings";
 import { onExtensionChange, collectBuildFilePattern } from "./plugin";
 import { serverTaskPresenter } from "./serverTaskPresenter";
@@ -29,7 +29,9 @@ import { markdownPreviewProvider } from "./markdownPreviewProvider";
 import { RefactorDocumentProvider, javaRefactorKinds } from "./codeActionProvider";
 import { typeHierarchyTree } from "./typeHierarchy/typeHierarchyTree";
 import { TypeHierarchyDirection, TypeHierarchyItem } from "./typeHierarchy/protocol";
+import { lsp2Code } from "./typeHierarchy/new/utils";
 import { buildFilePatterns } from './plugin';
+import { lspBasedTypeHierarchyTree } from "./typeHierarchy/new/lspBasedTypeHierarchyTree";
 
 const extensionName = 'Language Support for Java';
 const GRADLE_CHECKSUM = "gradle/checksum/prompt";
@@ -289,15 +291,17 @@ export class StandardLanguageClient {
 				}
 			}));
 
-			context.subscriptions.push(commands.registerCommand(Commands.SHOW_TYPE_HIERARCHY, (location: any) => {
-				if (location instanceof Uri) {
-					typeHierarchyTree.setTypeHierarchy(new Location(location, window.activeTextEditor.selection.active), TypeHierarchyDirection.Both);
-				} else {
-					if (window.activeTextEditor?.document?.languageId !== "java") {
-						return;
-					}
-					typeHierarchyTree.setTypeHierarchy(new Location(window.activeTextEditor.document.uri, window.activeTextEditor.selection.active), TypeHierarchyDirection.Both);
-				}
+			context.subscriptions.push(commands.registerCommand(Commands.SHOW_TYPE_HIERARCHY, async (location: any) => {
+				const params: TypeHierarchyPrepareParams = {
+					position:  window.activeTextEditor.selection.active,
+					textDocument: { uri: window.activeTextEditor.document.uri.toString() }
+				};
+				const itemsInLsp = await this.languageClient.sendRequest(PrepareTypeHierarchy.type, params);
+				const itemsInCode = itemsInLsp.map(item => lsp2Code(this.languageClient, item));
+				console.log(itemsInCode);
+				const location 
+				lspBasedTypeHierarchyTree.show(location, itemsInCode);
+				// TODO: visualize items
 			}));
 
 			context.subscriptions.push(commands.registerCommand(Commands.SHOW_CLASS_HIERARCHY, () => {

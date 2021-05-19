@@ -2,18 +2,23 @@
 
 import {
     CodeActionParams,
+    DocumentUri,
     ExecuteCommandParams,
     FormattingOptions,
     Location,
     NotificationType,
+    PartialResultParams,
     RequestType,
     SymbolInformation,
     TextDocumentIdentifier,
     TextDocumentPositionParams,
+    WorkDoneProgressParams,
     WorkspaceEdit,
     WorkspaceSymbolParams,
 } from 'vscode-languageclient';
 import { Command, Range } from 'vscode';
+import * as code from "vscode";
+import * as ls from "vscode-languageclient";
 
 /**
  * The message type. Copied from vscode protocol
@@ -405,4 +410,141 @@ export interface RenameFilesParams {
 
 export namespace WillRenameFiles {
     export const type = new RequestType<RenameFilesParams, WorkspaceEdit, void>('workspace/willRenameFiles');
+}
+
+/**
+ * Represents programming constructs like functions or constructors in the context
+ * of type hierarchy.
+ *
+ * @since 3.17.0
+ */
+export interface TypeHierarchyItem_Code {
+	/**
+	 * The name of this item.
+	 */
+	 name: string;
+	 /**
+		* The kind of this item.
+		*/
+	 kind: code.SymbolKind;
+	 /**
+		* Tags for this item.
+		*/
+	 tags?: code.SymbolTag[];
+	 /**
+		* More detail for this item, e.g. the signature of a function.
+		*/
+	 detail?: string;
+	 /**
+		* The resource identifier of this item.
+		*/
+	 uri: DocumentUri;
+	 /**
+		* The range enclosing this symbol not including leading/trailing whitespace
+		* but everything else, e.g. comments and code.
+		*/
+	 range: code.Range;
+	 /**
+		* The range that should be selected and revealed when this symbol is being
+		* picked, e.g. the name of a function. Must be contained by the
+		* [`range`](#TypeHierarchyItem.range).
+		*/
+	 selectionRange: code.Range;
+	 /**
+		* A data entry field that is preserved between a type hierarchy prepare and
+		* supertypes or subtypes requests. It could also be used to identify the
+		* type hierarchy in the server, helping improve the performance on
+		* resolving supertypes and subtypes.
+		*/
+	 data?: unknown;
+}
+
+/**
+ * Represents programming constructs like functions or constructors in the context
+ * of type hierarchy.
+ *
+ * @since 3.17.0
+ */
+ export interface TypeHierarchyItem_LS {
+	/**
+	 * The name of this item.
+	 */
+	 name: string;
+	 /**
+		* The kind of this item.
+		*/
+	 kind: ls.SymbolKind;
+	 /**
+		* Tags for this item.
+		*/
+	 tags?: ls.SymbolTag[];
+	 /**
+		* More detail for this item, e.g. the signature of a function.
+		*/
+	 detail?: string;
+	 /**
+		* The resource identifier of this item.
+		*/
+	 uri: DocumentUri;
+	 /**
+		* The range enclosing this symbol not including leading/trailing whitespace
+		* but everything else, e.g. comments and code.
+		*/
+	 range: ls.Range;
+	 /**
+		* The range that should be selected and revealed when this symbol is being
+		* picked, e.g. the name of a function. Must be contained by the
+		* [`range`](#TypeHierarchyItem.range).
+		*/
+	 selectionRange: ls.Range;
+	 /**
+		* A data entry field that is preserved between a type hierarchy prepare and
+		* supertypes or subtypes requests. It could also be used to identify the
+		* type hierarchy in the server, helping improve the performance on
+		* resolving supertypes and subtypes.
+		*/
+	 data?: unknown;
+}
+
+
+/**
+ * The parameter of a `textDocument/prepareTypeHierarchy` request.
+ *
+ * @since 3.17.0
+ */
+export interface TypeHierarchyPrepareParams extends TextDocumentPositionParams, WorkDoneProgressParams {
+}
+
+/**
+ * The parameter of a `typeHierarchy/supertypes` request.
+ *
+ * @since 3.17.0
+ */
+export interface TypeHierarchySupertypesParams extends WorkDoneProgressParams, PartialResultParams {
+	/**
+	 * If this is set to `true`, The request only asks for super class.
+	 */
+	classOnly?: boolean;
+	item: TypeHierarchyItem_LS;
+}
+
+/**
+ * The parameter of a `typeHierarchy/subtypes` request.
+ *
+ * @since 3.17.0
+ */
+export interface TypeHierarchySubtypesParams extends WorkDoneProgressParams, PartialResultParams {
+	item: TypeHierarchyItem_LS;
+}
+
+export namespace PrepareTypeHierarchy {
+    export const type = new RequestType<TypeHierarchyPrepareParams, TypeHierarchyItem_LS[] | null, void>('java/prepareTypeHierarchy');
+}
+
+export namespace Supertypes {
+    export const type = new RequestType<TypeHierarchySupertypesParams, TypeHierarchyItem_LS[] | null, void>('java/supertypes');
+}
+
+export namespace Subtypes {
+    export const type = new RequestType<TypeHierarchySubtypesParams, TypeHierarchyItem_LS[] | null, void>('java/subtypes');
 }
