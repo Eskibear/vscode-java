@@ -1,13 +1,13 @@
 'use strict';
 
-import { ExtensionContext, window, workspace, commands, Uri, ProgressLocation, ViewColumn, EventEmitter, extensions, Location, languages, CodeActionKind, TextEditor, CancellationToken } from "vscode";
+import { ExtensionContext, window, workspace, commands, Uri, ProgressLocation, ViewColumn, EventEmitter, extensions, Location, languages, CodeActionKind, TextEditor, CancellationToken, SymbolKind } from "vscode";
 import { Commands } from "./commands";
 import { serverStatus, ServerStatusKind } from "./serverStatus";
 import { prepareExecutable, awaitServerConnection } from "./javaServerStarter";
 import { getJavaConfig, applyWorkspaceEdit } from "./extension";
 import { LanguageClientOptions, Position as LSPosition, Location as LSLocation, MessageType, TextDocumentPositionParams, ConfigurationRequest, ConfigurationParams } from "vscode-languageclient";
 import { LanguageClient, StreamInfo } from "vscode-languageclient/node";
-import { CompileWorkspaceRequest, CompileWorkspaceStatus, SourceAttachmentRequest, SourceAttachmentResult, SourceAttachmentAttribute, ProjectConfigurationUpdateRequest, FeatureStatus, StatusNotification, ProgressReportNotification, ActionableNotification, ExecuteClientCommandRequest, ServerNotification, EventNotification, EventType, LinkLocation, FindLinks, PrepareTypeHierarchy, TypeHierarchyPrepareParams } from "./protocol";
+import { CompileWorkspaceRequest, CompileWorkspaceStatus, SourceAttachmentRequest, SourceAttachmentResult, SourceAttachmentAttribute, ProjectConfigurationUpdateRequest, FeatureStatus, StatusNotification, ProgressReportNotification, ActionableNotification, ExecuteClientCommandRequest, ServerNotification, EventNotification, EventType, LinkLocation, FindLinks, PrepareTypeHierarchy, TypeHierarchyPrepareParams, TypeHierarchyItem_Code, Subtypes, TypeHierarchySubtypesParams, Supertypes, RootType } from "./protocol";
 import { setGradleWrapperChecksum, excludeProjectSettingsFiles, ServerMode } from "./settings";
 import { onExtensionChange, collectBuildFilePattern } from "./plugin";
 import { serverTaskPresenter } from "./serverTaskPresenter";
@@ -29,7 +29,7 @@ import { markdownPreviewProvider } from "./markdownPreviewProvider";
 import { RefactorDocumentProvider, javaRefactorKinds } from "./codeActionProvider";
 import { typeHierarchyTree } from "./typeHierarchy/typeHierarchyTree";
 import { TypeHierarchyDirection, TypeHierarchyItem } from "./typeHierarchy/protocol";
-import { lsp2Code } from "./typeHierarchy/new/utils";
+import { code2Lsp, lsp2Code } from "./typeHierarchy/new/utils";
 import { buildFilePatterns } from './plugin';
 import { lspBasedTypeHierarchyTree } from "./typeHierarchy/new/lspBasedTypeHierarchyTree";
 
@@ -291,29 +291,62 @@ export class StandardLanguageClient {
 				}
 			}));
 
-			context.subscriptions.push(commands.registerCommand(Commands.SHOW_TYPE_HIERARCHY, async (location: any) => {
+			context.subscriptions.push(commands.registerCommand(Commands.SHOW_TYPE_HIERARCHY, async (_param: any) => {
 				const params: TypeHierarchyPrepareParams = {
 					position:  window.activeTextEditor.selection.active,
 					textDocument: { uri: window.activeTextEditor.document.uri.toString() }
 				};
 				const itemsInLsp = await this.languageClient.sendRequest(PrepareTypeHierarchy.type, params);
 				const itemsInCode = itemsInLsp.map(item => lsp2Code(this.languageClient, item));
-				console.log(itemsInCode);
-				const location 
-				lspBasedTypeHierarchyTree.show(location, itemsInCode);
-				// TODO: visualize items
+				const location: Location = new Location(window.activeTextEditor.document.uri, window.activeTextEditor.selection.active);
+				// Suppose to be 1 item
+				if (itemsInCode[0].kind === SymbolKind.Interface) {
+					lspBasedTypeHierarchyTree.show(location, itemsInCode, "subtypes");
+				} else {
+					lspBasedTypeHierarchyTree.show(location, itemsInCode, "classview");
+				}
+			}));
+
+			context.subscriptions.push(commands.registerCommand("java.subtypes", async (item: TypeHierarchyItem_Code) => {
+				const itemInLsp = code2Lsp(this.languageClient, item);
+				const params: TypeHierarchySubtypesParams = {
+					item: itemInLsp
+				};
+				const itemsInLsp = await this.languageClient.sendRequest(Subtypes.type, params);
+				const itemsInCode = itemsInLsp.map(item => lsp2Code(this.languageClient, item));
+				return itemsInCode;
+			}));
+
+			context.subscriptions.push(commands.registerCommand("java.supertypes", async (item: TypeHierarchyItem_Code) => {
+				const itemInLsp = code2Lsp(this.languageClient, item);
+				const params: TypeHierarchySubtypesParams = {
+					item: itemInLsp
+				};
+				const itemsInLsp = await this.languageClient.sendRequest(Supertypes.type, params);
+				const itemsInCode = itemsInLsp.map(item => lsp2Code(this.languageClient, item));
+				return itemsInCode;
+			}));
+
+			context.subscriptions.push(commands.registerCommand("java.rootType", async (item: TypeHierarchyItem_Code) => {
+				const itemInLsp = code2Lsp(this.languageClient, item);
+				const params: TypeHierarchySubtypesParams = {
+					item: itemInLsp
+				};
+				const rootInLsp = await this.languageClient.sendRequest(RootType.type, params);
+				const rootInCode = lsp2Code(this.languageClient, rootInLsp);
+				return rootInCode;
 			}));
 
 			context.subscriptions.push(commands.registerCommand(Commands.SHOW_CLASS_HIERARCHY, () => {
-				typeHierarchyTree.changeDirection(TypeHierarchyDirection.Both);
+				lspBasedTypeHierarchyTree.showClassView();
 			}));
 
 			context.subscriptions.push(commands.registerCommand(Commands.SHOW_SUPERTYPE_HIERARCHY, () => {
-				typeHierarchyTree.changeDirection(TypeHierarchyDirection.Parents);
+				lspBasedTypeHierarchyTree.showSuperTypes();
 			}));
 
 			context.subscriptions.push(commands.registerCommand(Commands.SHOW_SUBTYPE_HIERARCHY, () => {
-				typeHierarchyTree.changeDirection(TypeHierarchyDirection.Children);
+				lspBasedTypeHierarchyTree.showSubTypes();
 			}));
 
 			context.subscriptions.push(commands.registerCommand(Commands.CHANGE_BASE_TYPE, async (item: TypeHierarchyItem) => {

@@ -7,9 +7,11 @@ import { TypeHierarchyItem_Code } from "../../protocol";
 
 export class TypeHierarchyTreeInput implements SymbolTreeInput<TypeHierarchyItem_Code> {
 	readonly contextValue: string = "javaTypeHierarchy";
-	readonly title: string;
+	public title: string;
+	private dataProvider: TypeHierarchyTreeDataProvider;
+	private treeModel: SymbolTreeModel<TypeHierarchyItem_Code>;
 
-	constructor(readonly location: vscode.Location, readonly mode: "supertypes" | "subtypes" | "classview", readonly baseItems: TypeHierarchyItem_Code[] /*, readonly token: CancellationToken */) {
+	constructor(readonly location: vscode.Location, public mode: "supertypes" | "subtypes" | "classview", readonly baseItems: TypeHierarchyItem_Code[] /*, readonly token: CancellationToken */) {
 		switch (mode) {
 			case "classview":
 				this.title = "Class View";
@@ -26,55 +28,32 @@ export class TypeHierarchyTreeInput implements SymbolTreeInput<TypeHierarchyItem
 	}
 
 	async resolve(): Promise<SymbolTreeModel<TypeHierarchyItem_Code>> {
-		const treeDataProvider = new TypeHierarchyTreeDataProvider(this.mode, this.baseItems);
+		this.dataProvider = new TypeHierarchyTreeDataProvider(this);
 
-		const treeModel: SymbolTreeModel<TypeHierarchyItem_Code> = {
-			message: "a meesage: e.g. 2000 items found",
-			provider: treeDataProvider,
+		this.treeModel = {
+			message: "we can put a message here with reference view API",
+			provider: this.dataProvider,
 			navigation: undefined // Optional
 		};
-		return null;
+		return this.treeModel;
 	}
 
 	with(location: vscode.Location): SymbolTreeInput<TypeHierarchyItem_Code> {
 		return new TypeHierarchyTreeInput(location, this.mode, this.baseItems);
 	}
 
-	// async resolve(): Promise<SymbolTreeModel<TypeHierarchyItem>> {
-	// 	if (!this.client) {
-	// 		this.client = await getActiveLanguageClient();
-	// 	}
-	// 	// workaround: await a second to make sure the success of reveal operation on baseItem, see: https://github.com/microsoft/vscode/issues/114989
-	// 	await new Promise<void>((resolve) => setTimeout(() => {
-	// 		resolve();
-	// 	}, 1000));
-
-	// 	this.rootItem = (this.direction === TypeHierarchyDirection.Both) ? await getRootItem(this.client, this.baseItem, this.token) : this.baseItem;
-	// 	const model: TypeHierarchyModel = new TypeHierarchyModel(this.rootItem, this.direction, this.baseItem);
-	// 	const provider = new TypeHierarchyTreeDataProvider(model, this.client, this.token);
-	// 	const treeModel: SymbolTreeModel<TypeHierarchyItem> = {
-	// 		provider: provider,
-	// 		message: undefined,
-	// 		navigation: model,
-	// 		dispose() {
-	// 			provider.dispose();
-	// 		}
-	// 	};
-	// 	commands.executeCommand('setContext', 'typeHierarchyDirection', typeHierarchyDirectionToContextString(this.direction));
-	// 	commands.executeCommand('setContext', 'typeHierarchySymbolKind', this.baseItem.kind);
-	// 	return treeModel;
-	// }
-
-	// with(location: vscode.Location): TypeHierarchyTreeInput {
-	// 	return new TypeHierarchyTreeInput(location, this.direction, this.token, this.baseItem);
-	// }
+	public setMessage(message: string) {
+		this.treeModel.message = message;
+	}
 }
 
 class TypeHierarchyTreeDataProvider implements vscode.TreeDataProvider<TypeHierarchyItem_Code> {
 	private readonly _emitter: vscode.EventEmitter<TypeHierarchyItem_Code> = new vscode.EventEmitter<TypeHierarchyItem_Code>();
 	public readonly onDidChangeTreeData: vscode.Event<TypeHierarchyItem_Code> = this._emitter.event;
 
-	constructor(readonly mode: "supertypes" | "subtypes" | "classview", readonly baseItems: TypeHierarchyItem_Code[]){}
+	constructor(private treeInput: TypeHierarchyTreeInput) {}
+
+	private typesCache: Map<TypeHierarchyItem_Code, TypeHierarchyItem_Code[]> = new Map();
 
 	dispose(): void {
 		this._emitter.dispose();
@@ -85,7 +64,6 @@ class TypeHierarchyTreeDataProvider implements vscode.TreeDataProvider<TypeHiera
 			return undefined;
 		}
 		const treeItem: vscode.TreeItem = new vscode.TreeItem(element.name);
-		treeItem.contextValue = "true"; // ???
 		treeItem.description = element.detail;
 		treeItem.iconPath = TypeHierarchyTreeDataProvider.getThemeIcon(element.kind);
 		if (element.uri !== undefined) {
@@ -98,29 +76,57 @@ class TypeHierarchyTreeDataProvider implements vscode.TreeDataProvider<TypeHiera
 			};
 		}
 
-		// workaround: set a specific id to refresh the collapsible state for treeItems, see: https://github.com/microsoft/vscode/issues/114614#issuecomment-763428052
-		treeItem.id = `${element.data}${Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)}`;
+		treeItem.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
+		// prefetch next level to predict collapsible state
+		let children: TypeHierarchyItem_Code[];
+		switch (this.treeInput.mode) {
+			case "classview": 
+			case "subtypes":
+				children = await vscode.commands.executeCommand("java.subtypes", element);
+				break;
+			case "supertypes":
+				children = await vscode.commands.executeCommand("java.supertypes", element);
+				break;
+			default:
+		}
+		if (children?.length !== undefined) {
+			this.typesCache.set(element, children);
+			if (children.length === 0) {
+				treeItem.collapsibleState = vscode.TreeItemCollapsibleState.None;
+			}
+		}
+
 		return treeItem;
 	}
 
 	async getChildren(element?: TypeHierarchyItem_Code): Promise<TypeHierarchyItem_Code[]> {
 		if (element === undefined) {
-			return this.baseItems;
+			if (this.treeInput.mode === "classview") {
+				if (this.treeInput.baseItems.find(TypeHierarchyTreeDataProvider.isClass)) {
+					return Promise.all(this.treeInput.baseItems.filter(TypeHierarchyTreeDataProvider.isClass).map(async (item): Promise<TypeHierarchyItem_Code> => await vscode.commands.executeCommand("java.rootType", item)));
+				} else {
+					return [];
+				}
+			} else {
+				return this.treeInput.baseItems;
+			}
 		}
 
-		// TODO: send requests for subtypes / supertypes
-		switch (this.mode) {
+		if (this.typesCache.has(element)) {
+			return this.typesCache.get(element);
+		}
+
+		switch (this.treeInput.mode) {
 			case "classview":
-				break; 
-			case "subtypes": 
-				break;
+			case "subtypes":
+				return vscode.commands.executeCommand("java.subtypes", element);
 			case "supertypes":
-				break;
+				return vscode.commands.executeCommand("java.supertypes", element);
 			default:
 				break;
 		}
-		
-		return undefined;
+
+		return [];
 	}
 
 	private static isWhiteListType(item: TypeHierarchyItem_Code): boolean {
@@ -157,5 +163,9 @@ class TypeHierarchyTreeDataProvider implements vscode.TreeDataProvider<TypeHiera
 	private static getThemeIcon(kind: vscode.SymbolKind): vscode.ThemeIcon | undefined {
 		const id = TypeHierarchyTreeDataProvider.themeIconIds[kind];
 		return id ? new vscode.ThemeIcon(id) : undefined;
+	}
+
+	private static isClass(item: TypeHierarchyItem_Code) {
+		return item.kind === vscode.SymbolKind.Class;
 	}
 }

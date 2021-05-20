@@ -17,3 +17,17 @@ export function lsp2Code(client: LanguageClient, itemInLsp: TypeHierarchyItem_LS
     };
     return itemInCode;
 }
+
+export function code2Lsp(client: LanguageClient, itemInCode: TypeHierarchyItem_Code): TypeHierarchyItem_LS {
+	const itemInLsp: TypeHierarchyItem_LS = {
+        name: itemInCode.name,
+        uri: itemInCode.uri,
+        data: itemInCode.data,
+        detail: itemInCode.detail,
+        kind: client.code2ProtocolConverter.asSymbolKind(itemInCode.kind),
+        range: client.code2ProtocolConverter.asRange(itemInCode.range),
+        selectionRange: client.code2ProtocolConverter.asRange(itemInCode.selectionRange), // TODO: selectionRange vs Range ?
+        tags: itemInCode.tags ? client.code2ProtocolConverter.asSymbolTags(itemInCode.tags) : undefined
+    };
+    return itemInLsp;
+}

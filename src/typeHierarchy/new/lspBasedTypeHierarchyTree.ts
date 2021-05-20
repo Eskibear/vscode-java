@@ -7,17 +7,33 @@ import { TypeHierarchyTreeInput } from "./model";
 
 class LspBasedTypeHierarchyTree {
     private tree: SymbolTree;
-    private client: LanguageClient;
+    private treeInput: TypeHierarchyTreeInput;
 
+    public async show(location: vscode.Location, items: TypeHierarchyItem_Code[], mode: "supertypes" | "subtypes" | "classview") {
+        if (!this.tree) {
+            this.tree = await vscode.extensions.getExtension<SymbolTree>('ms-vscode.references-view').activate();
+        }
+        this.treeInput = new TypeHierarchyTreeInput(location, mode, items);
+        this.tree.setInput(this.treeInput);
+        
+    }
 
-    public async initialize() {
-		this.tree = await vscode.extensions.getExtension<SymbolTree>('ms-vscode.references-view').activate();
-		this.client = await getActiveLanguageClient();
-	}
+    public showSuperTypes() {
+        this.treeInput.mode = "supertypes";
+        this.treeInput.title = "Supertype Hierarchy";
+        this.tree.setInput(this.treeInput);
+    }
 
-    public show(item: TypeHierarchyItem_Code[]) {
-        const treeInput = new TypeHierarchyTreeInput();
-        this.tree.setInput();
+    public showSubTypes() {
+        this.treeInput.mode = "subtypes";
+        this.treeInput.title = "Subtype Hierarchy";
+        this.tree.setInput(this.treeInput);
+    }
+
+    public showClassView() {
+        this.treeInput.mode = "classview";
+        this.treeInput.title = "Class View";
+        this.tree.setInput(this.treeInput);
     }
 }
 

@@ -548,3 +548,8 @@ export namespace Supertypes {
 export namespace Subtypes {
     export const type = new RequestType<TypeHierarchySubtypesParams, TypeHierarchyItem_LS[] | null, void>('java/subtypes');
 }
+
+// fake
+export namespace RootType {
+    export const type = new RequestType<TypeHierarchySubtypesParams, TypeHierarchyItem_LS | null, void>('java/rootType');
+}
