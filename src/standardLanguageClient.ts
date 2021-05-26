@@ -29,9 +29,9 @@ import { markdownPreviewProvider } from "./markdownPreviewProvider";
 import { RefactorDocumentProvider, javaRefactorKinds } from "./codeActionProvider";
 import { typeHierarchyTree } from "./typeHierarchy/typeHierarchyTree";
 import { TypeHierarchyDirection, TypeHierarchyItem } from "./typeHierarchy/protocol";
-import { code2Lsp, lsp2Code } from "./typeHierarchy/new/utils";
+import { code2Lsp, lsp2Code } from "./typeHierarchy/lsp-based-solution/utils";
 import { buildFilePatterns } from './plugin';
-import { lspBasedTypeHierarchyTree } from "./typeHierarchy/new/lspBasedTypeHierarchyTree";
+import { lspBasedTypeHierarchyTree } from "./typeHierarchy/lsp-based-solution/lspBasedTypeHierarchyTree";
 
 const extensionName = 'Language Support for Java';
 const GRADLE_CHECKSUM = "gradle/checksum/prompt";

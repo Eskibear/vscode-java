@@ -864,21 +864,21 @@
         "command": "java.action.showClassHierarchy",
         "title": "Show Class Hierarchy",
         "icon": "$(type-hierarchy)",
-        "enablement": "typeHierarchyDirection != both && typeHierarchySymbolKind != 10",
+        "enablement": "typeHierarchyMode != classview",
         "category": "Java"
       },
       {
         "command": "java.action.showSupertypeHierarchy",
         "title": "Show Supertype Hierarchy",
         "icon": "$(type-hierarchy-super)",
-        "enablement": "typeHierarchyDirection != parents",
+        "enablement": "typeHierarchyMode != supertypes",
         "category": "Java"
       },
       {
         "command": "java.action.showSubtypeHierarchy",
         "title": "Show Subtype Hierarchy",
         "icon": "$(type-hierarchy-sub)",
-        "enablement": "typeHierarchyDirection != children",
+        "enablement": "typeHierarchyMode != subtypes",
         "category": "Java"
       },
       {

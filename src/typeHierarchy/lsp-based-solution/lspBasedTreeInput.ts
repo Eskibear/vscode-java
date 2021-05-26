@@ -4,6 +4,7 @@ import { getActiveLanguageClient } from "../../extension";
 import { LanguageClient } from "vscode-languageclient/node";
 import { CancellationToken, commands, workspace } from "vscode";
 import { TypeHierarchyItem_Code } from "../../protocol";
+import { getThemeIcon, isClass } from "./utils";
 
 export class TypeHierarchyTreeInput implements SymbolTreeInput<TypeHierarchyItem_Code> {
 	readonly contextValue: string = "javaTypeHierarchy";
@@ -11,11 +12,8 @@ export class TypeHierarchyTreeInput implements SymbolTreeInput<TypeHierarchyItem
 	private dataProvider: TypeHierarchyTreeDataProvider;
 	private treeModel: SymbolTreeModel<TypeHierarchyItem_Code>;
 
-	constructor(readonly location: vscode.Location, public mode: "supertypes" | "subtypes" | "classview", readonly baseItems: TypeHierarchyItem_Code[] /*, readonly token: CancellationToken */) {
+	constructor(readonly location: vscode.Location, public mode: "supertypes" | "subtypes", readonly baseItems: TypeHierarchyItem_Code[] /*, readonly token: CancellationToken */) {
 		switch (mode) {
-			case "classview":
-				this.title = "Class View";
-				break;
 			case "supertypes":
 				this.title = "Supertype Hierarchy";
 				break;
@@ -65,7 +63,7 @@ class TypeHierarchyTreeDataProvider implements vscode.TreeDataProvider<TypeHiera
 		}
 		const treeItem: vscode.TreeItem = new vscode.TreeItem(element.name);
 		treeItem.description = element.detail;
-		treeItem.iconPath = TypeHierarchyTreeDataProvider.getThemeIcon(element.kind);
+		treeItem.iconPath = getThemeIcon(element.kind);
 		if (element.uri !== undefined) {
 			treeItem.command = {
 				command: 'vscode.open',
@@ -76,11 +74,15 @@ class TypeHierarchyTreeDataProvider implements vscode.TreeDataProvider<TypeHiera
 			};
 		}
 
-		treeItem.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
+		if (this.treeInput.baseItems.includes(element)) {
+			treeItem.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
+		} else {
+			treeItem.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
+		}
+
 		// prefetch next level to predict collapsible state
 		let children: TypeHierarchyItem_Code[];
-		switch (this.treeInput.mode) {
-			case "classview": 
+		switch (this.treeInput.mode) { 
 			case "subtypes":
 				children = await vscode.commands.executeCommand("java.subtypes", element);
 				break;
@@ -101,15 +103,7 @@ class TypeHierarchyTreeDataProvider implements vscode.TreeDataProvider<TypeHiera
 
 	async getChildren(element?: TypeHierarchyItem_Code): Promise<TypeHierarchyItem_Code[]> {
 		if (element === undefined) {
-			if (this.treeInput.mode === "classview") {
-				if (this.treeInput.baseItems.find(TypeHierarchyTreeDataProvider.isClass)) {
-					return Promise.all(this.treeInput.baseItems.filter(TypeHierarchyTreeDataProvider.isClass).map(async (item): Promise<TypeHierarchyItem_Code> => await vscode.commands.executeCommand("java.rootType", item)));
-				} else {
-					return [];
-				}
-			} else {
-				return this.treeInput.baseItems;
-			}
+			return this.treeInput.baseItems;
 		}
 
 		if (this.typesCache.has(element)) {
@@ -117,7 +111,6 @@ class TypeHierarchyTreeDataProvider implements vscode.TreeDataProvider<TypeHiera
 		}
 
 		switch (this.treeInput.mode) {
-			case "classview":
 			case "subtypes":
 				return vscode.commands.executeCommand("java.subtypes", element);
 			case "supertypes":
@@ -152,20 +145,5 @@ class TypeHierarchyTreeDataProvider implements vscode.TreeDataProvider<TypeHiera
 		};
 	}
 
-	private static themeIconIds = [
-		'symbol-file', 'symbol-module', 'symbol-namespace', 'symbol-package', 'symbol-class', 'symbol-method',
-		'symbol-property', 'symbol-field', 'symbol-constructor', 'symbol-enum', 'symbol-interface',
-		'symbol-function', 'symbol-variable', 'symbol-constant', 'symbol-string', 'symbol-number', 'symbol-boolean',
-		'symbol-array', 'symbol-object', 'symbol-key', 'symbol-null', 'symbol-enum-member', 'symbol-struct',
-		'symbol-event', 'symbol-operator', 'symbol-type-parameter'
-	];
 
-	private static getThemeIcon(kind: vscode.SymbolKind): vscode.ThemeIcon | undefined {
-		const id = TypeHierarchyTreeDataProvider.themeIconIds[kind];
-		return id ? new vscode.ThemeIcon(id) : undefined;
-	}
-
-	private static isClass(item: TypeHierarchyItem_Code) {
-		return item.kind === vscode.SymbolKind.Class;
-	}
 }
